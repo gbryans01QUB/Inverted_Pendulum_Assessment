@@ -1,0 +1,99 @@
+# QUESTION 4
+import sympy as sym
+import numpy as np
+# LINEARISATION!
+# φ(F, x3, x4) ~ φ(F0, x30, x40) + (dφ/dF)(F0, x30, x40) * (F - F0)
+#                                + (dφ/dx3)(F0, x30, x40) * (x3 - x30)
+#                                + (dφ/dx4)(F0, x30, x40) * (x4 - x40)
+# Define all involved symbolic variables
+# constants
+M, m, g, ell = sym.symbols('M, m, g, ell', real=True, positive=True)
+# system variables
+x1, x2, x3, x4, F = sym.symbols('x1, x2, x3, x4, F')
+
+# Define φ
+phi = 4 * m * ell * x4**2 * sym.sin(x3) + 4 * F - 3 * m * g * sym.sin(x3) * sym.cos(x3)
+phi /= 4 * (M + m) - 3 * m * sym.cos(x3)**2
+
+# Define psi
+psi = -3 * (m * ell * x4 ** 2 * sym.sin(x3) * sym.cos(x3) + F * sym.cos(x3) - (M + m) * g * sym.sin(x3))
+psi /= (4 * (M + m) - 3 * m * sym.cos(x3) ** 2) * ell
+
+# Determine the (partial) derivatives of φ, wrt to F, x3, x4
+phi_deriv_F = phi.diff(F)
+phi_deriv_x3 = phi.diff(x3)
+phi_deriv_x4 = phi.diff(x4)
+
+# Determine partial derivatives of psi wrt F, x3 and x4
+psi_deriv_F = psi.diff(F)
+psi_deriv_x3 = psi.diff(x3)
+psi_deriv_x4 = psi.diff(x4)
+
+# Equilibrium values of F, x3 and x4
+F0 = 0
+x30 = 0
+x40 = 0
+
+# Define phi and psi equilibrium values
+phi_deriv_F_at_equlibrium = phi_deriv_F.subs([(F, F0), (x3, x30), (x4, x40)])
+phi_deriv_x3_at_equlibrium = phi_deriv_x3.subs([(F, F0), (x3, x30), (x4, x40)])
+phi_deriv_x4_at_equlibrium = phi_deriv_x4.subs([(F, F0), (x3, x30), (x4, x40)])
+
+psi_deriv_F_at_equilibrium = psi_deriv_F.subs([(F, F0), (x3, x30), (x4, x40)])
+psi_deriv_x3_at_equilibrium = psi_deriv_x3.subs([(F, F0), (x3, x30), (x4, x40)])
+psi_deriv_x4_at_equilibrium = psi_deriv_x4.subs([(F, F0), (x3, x30), (x4, x40)])
+
+
+# x2' = aF - bx3    and     x4' = -cF + dx3, so we can sub in values at equilibrium
+a = phi_deriv_F_at_equlibrium
+b = -phi_deriv_x3_at_equlibrium
+c = -psi_deriv_F_at_equilibrium
+d = psi_deriv_x3_at_equilibrium
+
+# ------Parameter values given in the question------
+M_value = 0.3
+m_value = 0.1
+ell_value = 0.35
+g_value = 9.81
+a_value = float(a.subs([(M, M_value), (m, m_value)]))
+b_value = float(b.subs([(M, M_value), (m, m_value), (g, g_value)]))
+c_value = float(c.subs([(M, M_value), (m, m_value), (g, g_value), (ell, ell_value)]))
+d_value = float(d.subs([(M, M_value), (m, m_value), (g, g_value), (ell, ell_value)]))
+
+# ------- ONLY NUMERICAL VALUES (nothing symbolic)
+import control as ctrl
+import matplotlib.pyplot as plt
+
+# ------ Transfer Function of G(theta) -----------
+G_theta = ctrl.TransferFunction([-c_value], [1, 0, -d_value])
+
+# ------ Transfer Function of G(x) -----------
+p1 = -d_value*a_value + b_value*c_value     # simplifies the last variable in the polynomial of numerator
+G_x = ctrl.TransferFunction([a_value, 0 , p1], [1, 0, -d_value, 0, 0])  # (numerator, denominator)
+
+n_points = 500
+t_final = 0.2
+t_span = np.linspace(0, t_final, n_points)     # time span is 0 to 0.2s
+input_signal = np.sin(100*np.square(t_span))
+
+# -------------Forced response on G(theta)
+t_out1, theta_out, x_out1 = ctrl.forced_response(G_theta, t_span, input_signal)
+
+# -----------Forced Response of G(x)
+t_out2, x1_out, x_out2 = ctrl.forced_response(G_x, t_span, input_signal)
+
+# Plot of theta(t)
+plt.plot(t_out1, theta_out)
+plt.title('Theta against Time')
+plt.xlabel('time / s')
+plt.ylabel('theta / rads')
+plt.grid()
+plt.show()
+
+# Plot of x(t)
+plt.plot(t_out2, x1_out)
+plt.title('X-trajectory against Time')
+plt.xlabel('time / s')
+plt.ylabel('x(t) / m')
+plt.grid()
+plt.show()
